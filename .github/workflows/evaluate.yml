@@ -9,7 +9,7 @@ on:
       answer_retrievers:
         description: Retrievers used for the answer evaluation
         type: choice
-        options: ["semantic", "semantic,bm25"]
+        options: ["semantic", "semantic,bm25", "semantic,bm25,hybrid"]
         default: semantic
       delay:
         description: Seconds between model calls (free-tier rate limits)

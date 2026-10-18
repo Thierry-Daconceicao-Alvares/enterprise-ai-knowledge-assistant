@@ -158,3 +158,20 @@ def test_copy_to_gives_an_independent_copy(sample_store, embedder):
 def test_empty_store_returns_no_hits(empty_store):
     assert SemanticRetriever(empty_store, LocalHashEmbedder()).search("anything", 5) == []
     assert BM25Retriever(empty_store).search("anything", 5) == []
+
+
+def test_hybrid_hits_keep_the_semantic_similarity(sample_store, embedder, bm25):
+    hybrid = HybridRetriever([SemanticRetriever(sample_store, embedder), bm25])
+    hits = hybrid.search("purchasing card single transaction limit", 10)
+    assert any(hit.similarity is not None for hit in hits)
+    assert all(hit.similarity is None or -1.0 <= hit.similarity <= 1.0 for hit in hits)
+
+
+@pytest.mark.parametrize(
+    ("name", "kind"),
+    [("semantic", SemanticRetriever), ("bm25", BM25Retriever), ("hybrid", HybridRetriever)],
+)
+def test_the_retriever_setting_selects_the_retriever(sample_store, embedder, name, kind):
+    from knowledge_assistant.factory import build_retriever
+
+    assert isinstance(build_retriever(name, sample_store, embedder), kind)
