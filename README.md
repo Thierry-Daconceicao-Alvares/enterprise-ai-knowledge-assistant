@@ -99,7 +99,7 @@ The Markdown sources are in [`data/sample_documents_src/`](data/sample_documents
 | Citations | File, page or page range, section, relevance score, passage text, original file download and rendered PDF page |
 | Interfaces | Streamlit web app, command line (`knowledge-assistant`), HTTP API (`/ask`, `/documents`) |
 | Evaluation | 62 labelled cases, deterministic scoring, Markdown and JSON reports, comparison with BM25 |
-| Engineering | 213 automated tests (offline), GitHub Actions CI, Docker image, structured JSON logs without document content |
+| Engineering | 217 automated tests (offline), GitHub Actions CI, Docker image, structured JSON logs without document content |
 
 ## 5. Architecture
 
@@ -165,7 +165,7 @@ The [technical design document](docs/technical-design.md) explains the data flow
 | Baseline | rank-bm25 | Simple keyword ranking to compare against semantic search |
 | Interface | Streamlit | Fast to build, easy for a reviewer to use |
 | API | FastAPI | Typed HTTP endpoints for integration with other tools |
-| Quality | pytest, ruff, GitHub Actions | 213 offline tests, lint and format checks on every push |
+| Quality | pytest, ruff, GitHub Actions | 217 offline tests, lint and format checks on every push |
 | Packaging | Docker, Streamlit Community Cloud | Reproducible run and a public demo |
 
 The model provider is isolated behind small interfaces (`AnswerGenerator`, `Embedder`), so another provider (OpenAI, Azure OpenAI, a local model) can be added without changing the pipeline. Dependency versions are pinned in [`pyproject.toml`](pyproject.toml) and reviewed in [docs/dependencies.md](docs/dependencies.md).
@@ -285,7 +285,7 @@ Errors are returned with a stable code: `invalid_question` (422), `configuration
 ## 12. Testing
 
 ```bash
-pytest                  # 213 tests, offline, about 20 seconds
+pytest                  # 217 tests, offline, about 20 seconds
 ruff check . && ruff format --check .
 ```
 
@@ -366,7 +366,7 @@ This prototype does not meet enterprise security requirements and should not be 
 - Treating hallucination as an engineering problem: answers are verified by code, not trusted because of a prompt.
 - Handling the messy parts of real document bases: outdated versions, contradictions, hidden instructions, malformed files.
 - Measuring quality with a labelled evaluation set, comparing against a baseline and reporting failures honestly.
-- Professional engineering practices: typed modules, 213 automated tests, CI, Docker, configuration and secrets management, structured logging, documentation.
+- Professional engineering practices: typed modules, 217 automated tests, CI, Docker, configuration and secrets management, structured logging, documentation.
 - Customer-facing work of a Forward Deployed Engineer: [discovery brief](docs/discovery-brief.md), [technical design](docs/technical-design.md), [implementation plan](docs/implementation-plan.md), [demo script](docs/demo-script.md).
 
 ## Project structure

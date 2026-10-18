@@ -159,6 +159,14 @@ except IndexMismatchError as exc:
     st.error(f"{exc}")
     st.code("knowledge-assistant rebuild --samples", language="bash")
     st.stop()
+except AssistantError as exc:  # for example the API quota while indexing the demo documents
+    st.title("Nexora Knowledge Assistant")
+    st.error(
+        "The assistant could not start because the language model API did not answer "
+        f"({exc.code}). This usually means the free-tier quota is exhausted: try again in a "
+        "minute."
+    )
+    st.stop()
 
 store = components.store
 ingestion = components.ingestion
@@ -225,11 +233,14 @@ with st.sidebar:
     elif not any(doc.file_name.startswith("NX-") for doc in documents) and st.button(
         "Load the 32 sample documents", icon=":material/library_add:", type="primary"
     ):
-        with st.spinner("Indexing the sample documents..."):
-            results = ingestion.ingest_folder(settings.sample_dir)
-        state.upload_results = [
-            ("success", "Sample documents", f"{sum(r.ok for r in results)} documents indexed.")
-        ]
+        try:
+            with st.spinner("Indexing the sample documents..."):
+                results = ingestion.ingest_folder(settings.sample_dir)
+            state.upload_results = [
+                ("success", "Sample documents", f"{sum(r.ok for r in results)} documents indexed.")
+            ]
+        except AssistantError as exc:
+            state.upload_results = [("error", "Sample documents", f"Indexing failed: {exc}")]
         st.rerun()
 
     with st.expander("Indexed documents", icon=":material/folder_open:"):
@@ -287,8 +298,11 @@ with st.sidebar:
                 icon=":material/refresh:",
                 help="Index the stored files again, for example after changing the chunk size.",
             ):
-                with st.spinner("Rebuilding..."):
-                    ingestion.rebuild(settings.sample_dir)
+                try:
+                    with st.spinner("Rebuilding..."):
+                        ingestion.rebuild(settings.sample_dir)
+                except AssistantError as exc:
+                    state.upload_results = [("error", "Rebuild", f"Rebuild failed: {exc}")]
                 st.rerun()
 
     st.divider()
