@@ -1,7 +1,7 @@
 # Enterprise AI Knowledge Assistant
 
 [![CI](https://github.com/Thierry-Daconceicao-Alvares/enterprise-ai-knowledge-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/Thierry-Daconceicao-Alvares/enterprise-ai-knowledge-assistant/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
+![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 A retrieval-augmented generation (RAG) assistant that answers employees' questions from company documents (PDF, Word and text files), cites the file, page and section of every source, and says so when the documents do not contain the answer. It is measured on a labelled evaluation set of 62 cases, including unanswerable questions, contradictory documents, outdated versions and prompt-injection attempts.
@@ -156,7 +156,7 @@ The [technical design document](docs/technical-design.md) explains the data flow
 
 | Layer | Choice | Why |
 |---|---|---|
-| Language | Python 3.11+ | Standard for AI applications; typed, tested modules |
+| Language | Python 3.12+ | Standard for AI applications; typed, tested modules |
 | Generation | Gemini API, `gemini-3.5-flash-lite` | Free tier for a public demo, JSON schema output, multilingual, low cost on the paid tier |
 | Embeddings | `gemini-embedding-001`, 768 dimensions | Multilingual (French questions on English documents), separate task types for queries and documents |
 | Vector store | Chroma (embedded, persistent) | No server to operate, metadata filters, enough for thousands of documents |
@@ -185,7 +185,7 @@ The four cases required by the brief are distinguished as follows: a fact stated
 
 ## 8. Installation
 
-Prerequisites: Python 3.11 or newer, Git, and a free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) (no credit card needed).
+Prerequisites: Python 3.12 or newer, Git, and a free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) (no credit card needed).
 
 ```bash
 git clone https://github.com/Thierry-Daconceicao-Alvares/enterprise-ai-knowledge-assistant.git
@@ -215,7 +215,7 @@ docker run -p 8501:8501 -e GEMINI_API_KEY=your-key -v ka-index:/app/data/index k
 | "rate limit or quota exceeded (HTTP 429)" | Free-tier limit: wait a minute; for the evaluation use `--delay 4` |
 | "The index was built with ..." | You changed the embedding model: run `knowledge-assistant rebuild --samples` |
 | A PDF is rejected with "no extractable text" | It is a scanned document; OCR is not supported in this version |
-| `pip` cannot install `chromadb` | Use Python 3.11 to 3.13 and upgrade pip (`python -m pip install -U pip`) |
+| `pip` cannot install a dependency | Use Python 3.12 or 3.13 and upgrade pip (`python -m pip install -U pip`) |
 
 ## 9. Configuration
 
@@ -301,7 +301,7 @@ The tests never call a paid API. They use the real sample documents, an in-memor
 | Interfaces | API endpoints and error codes, command line, Streamlit pages (AppTest) |
 | Evaluation | Labels match the corpus, scoring rules, report generation |
 
-The CI workflow runs the tests on Python 3.11 and 3.13, builds the Docker image and checks that the container starts.
+The CI workflow runs the tests on Python 3.12 and 3.13, builds the Docker image and checks that the container starts.
 
 ## 13. Evaluation methodology and results
 

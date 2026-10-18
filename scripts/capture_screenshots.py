@@ -81,8 +81,17 @@ def main() -> int:
     port = free_port()
     env = {**os.environ, "DATA_DIR": str(data_dir), "PUBLIC_DEMO": "false", "LOG_LEVEL": "WARNING"}
     server = subprocess.Popen(
-        [sys.executable, "-m", "streamlit", "run", str(ROOT / "app" / "streamlit_app.py"),
-         "--server.port", str(port), "--server.headless", "true"],
+        [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            str(ROOT / "app" / "streamlit_app.py"),
+            "--server.port",
+            str(port),
+            "--server.headless",
+            "true",
+        ],
         env=env,
         cwd=ROOT,
     )

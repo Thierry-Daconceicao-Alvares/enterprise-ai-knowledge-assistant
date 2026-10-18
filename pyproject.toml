@@ -7,7 +7,7 @@ name = "enterprise-ai-knowledge-assistant"
 version = "1.0.0"
 description = "Retrieval-augmented assistant that answers questions from company documents (PDF, DOCX, TXT) with page-level citations, abstains when the evidence is missing, and is measured on a labelled evaluation set."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "MIT"
 authors = [{ name = "Thierry Daconceição Alvares" }]
 dependencies = [
@@ -43,7 +43,7 @@ filterwarnings = ["ignore::DeprecationWarning:chromadb.*"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
