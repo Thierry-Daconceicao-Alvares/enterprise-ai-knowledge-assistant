@@ -1,0 +1,45 @@
+---
+doc_id: NX-IT-002
+title: Password and Account Security Standard
+version: 2.0
+effective_date: 2025-09-01
+owner: Chief Information Security Officer
+status: Current
+format: txt
+file: NX-IT-002_password-and-account-security_v2.0.txt
+---
+
+## 1. Scope
+
+This standard applies to every account that gives access to Nexora systems: Windows and email accounts, the ERP, cloud applications and production systems.
+
+## 2. Password requirements
+
+- Passwords must be at least 14 characters long. Passphrases made of several words are encouraged, for example four unrelated words.
+- A new password must not be one of your last 10 passwords.
+- Passwords are checked automatically against a list of known compromised passwords and are refused if they appear in it.
+- Never use your Nexora password for a personal account or another website.
+
+## 3. Password changes
+
+Passwords do not expire and you are not asked to change them periodically. You must change your password immediately if you think it has been disclosed or compromised, or when the IT Security team asks you to.
+
+## 4. Multi-factor authentication
+
+Multi-factor authentication (MFA) with the Nexora Authenticator app is mandatory for email, the VPN and all cloud applications. Never approve an MFA request that you did not initiate: report it to the Service Desk as a security incident (NX-IT-005).
+
+## 5. Account lockout
+
+An account is locked for 15 minutes after 10 consecutive failed sign-in attempts.
+
+## 6. Resetting a forgotten password
+
+Use the self-service password portal, which verifies your identity with MFA. If you cannot use the portal, call the Service Desk (extension 4357): the agent verifies your employee ID and confirms your identity with your line manager before resetting the password.
+
+## 7. Sharing accounts and passwords
+
+Accounts are personal. Never share your password with anyone, including colleagues or your manager. The IT department will never ask you for your password, by email, by phone or in person.
+
+## 8. Document history
+
+Version 2.0 replaces version 1.0 of February 2021. Main changes: minimum length increased to 14 characters, periodic password changes removed and MFA extended to all cloud applications.

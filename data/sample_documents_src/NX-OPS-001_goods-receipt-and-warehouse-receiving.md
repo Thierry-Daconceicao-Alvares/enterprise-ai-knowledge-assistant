@@ -1,0 +1,38 @@
+---
+doc_id: NX-OPS-001
+title: Goods Receipt and Warehouse Receiving
+version: 2.2
+effective_date: 2025-07-01
+owner: Head of Logistics
+status: Current
+format: txt
+file: NX-OPS-001_goods-receipt-and-warehouse-receiving.txt
+---
+
+## 1. Delivery hours
+
+Plants receive deliveries from Monday to Friday, from 6:00 to 14:00. The Orléans distribution center receives deliveries from 6:00 to 20:00. Deliveries outside these hours need an appointment booked by the buyer with the warehouse team.
+
+## 2. Checks at unloading
+
+- Check that the delivery note shows a valid Nexora purchase order number. Deliveries without a PO number are refused, except emergency purchases announced in advance by the buyer (NX-PUR-001, section 6).
+- Count the packages and compare them with the delivery note.
+- Check the packaging for visible damage before signing the carrier's document.
+
+## 3. Recording the goods receipt
+
+The goods receipt is recorded in the ERP within 24 hours of the delivery, with the quantity actually received, which may differ from the quantity on the delivery note. Accounts Payable needs the goods receipt to match and pay the supplier's invoice (NX-FIN-001).
+
+## 4. Damaged or incorrect deliveries
+
+- Write precise reservations on the carrier's delivery document, for example "3 cartons crushed", and take photos.
+- Inform the buyer on the same day.
+- Confirm the reservations to the carrier by registered letter or email within 3 days, not counting public holidays, otherwise the carrier is not liable.
+
+## 5. Direct materials and incoming inspection
+
+Direct materials and production parts are placed in "quality inspection" stock until Quality releases them, according to the incoming inspection plan of each part. Parts from a supplier under a new business hold or in class C (NX-PUR-007) are inspected at 100% until Quality decides otherwise.
+
+## 6. Hazardous materials
+
+Hazardous materials are accepted only with their safety data sheet (SDS) in French. They are stored immediately in the dedicated hazardous materials area, never in the general warehouse.
