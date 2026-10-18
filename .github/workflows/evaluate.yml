@@ -1,0 +1,63 @@
+# Runs the evaluation set against the Gemini API and captures the README
+# screenshots. Started manually; needs the GEMINI_API_KEY repository secret.
+# Results are uploaded as an artifact, reviewed, then committed by hand.
+name: Evaluate with Gemini
+
+on:
+  workflow_dispatch:
+    inputs:
+      answer_retrievers:
+        description: Retrievers used for the answer evaluation
+        type: choice
+        options: ["semantic", "semantic,bm25"]
+        default: semantic
+      delay:
+        description: Seconds between model calls (free-tier rate limits)
+        type: choice
+        options: ["0", "2", "4", "8"]
+        default: "4"
+      screenshots:
+        description: Capture the README screenshots
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[ui,dev]"
+      - name: Run the evaluation
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANSWER_RETRIEVERS: ${{ inputs.answer_retrievers }}
+          DELAY: ${{ inputs.delay }}
+        run: |
+          knowledge-assistant evaluate --answer-retrievers "$ANSWER_RETRIEVERS" \
+            --delay "$DELAY" --output eval/results/latest
+      - name: Capture the screenshots
+        if: ${{ inputs.screenshots }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          pip install playwright==1.64.0
+          playwright install --with-deps chromium
+          python scripts/capture_screenshots.py --output docs/images
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: evaluation-run-${{ github.run_number }}
+          path: |
+            eval/results/latest
+            docs/images
+          if-no-files-found: warn
