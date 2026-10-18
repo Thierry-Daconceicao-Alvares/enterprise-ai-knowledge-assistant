@@ -1,0 +1,3 @@
+# Used by Streamlit Community Cloud, which installs this file.
+# For local development use: pip install -e ".[ui,dev]" (versions are pinned in pyproject.toml)
+-e .[ui]

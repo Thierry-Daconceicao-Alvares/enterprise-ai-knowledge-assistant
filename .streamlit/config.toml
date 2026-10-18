@@ -1,0 +1,13 @@
+[server]
+# Same limit as MAX_FILE_MB (default 10 MB)
+maxUploadSize = 10
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "viewer"
+
+[theme]
+primaryColor = "#1F4E79"

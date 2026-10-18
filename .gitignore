@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# Secrets: never commit them
+.env
+.streamlit/secrets.toml
+
+# Local index and uploaded files
+data/index/
+data/storage/
+
+# Evaluation runs (the published reports are in eval/results/<date>/)
+eval/results/latest/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
