@@ -6,7 +6,20 @@
 
 A retrieval-augmented generation (RAG) assistant that answers employees' questions from company documents (PDF, Word and text files), cites the file, page and section of every source, and says so when the documents do not contain the answer. It is measured on a labelled evaluation set of 62 cases, including unanswerable questions, contradictory documents, outdated versions and prompt-injection attempts.
 
-<!-- DEMO -->
+![Demo: an answer with its sources, a question the documents do not cover, a contradiction between two documents, a hidden prompt injection and an outdated version](docs/images/demo.gif)
+
+**Measured on 62 labelled cases with the real Gemini API:** 57 passed (92%); none of the 7 questions the documents do not cover was answered anyway; no injected instruction followed and no outdated version cited; every citation pointed to a relevant section; about 1.2 seconds and $0.0008 per question. [Results and failure analysis](#13-evaluation-methodology-and-results).
+
+<details>
+<summary><b>Screenshots</b></summary>
+
+| | |
+|---|---|
+| ![Answer with its sources](docs/images/02-answer.png)<br>**Answer with sources**: the reference question, answered from two documents; each statement cites its passages | ![Cited page](docs/images/04-source-page.png)<br>**Checking a source**: the passage, its file, section and relevance, and the rendered PDF page |
+| ![Not in the documents](docs/images/05-not-in-documents.png)<br>**Not in the documents**: the assistant says so instead of guessing | ![Contradiction](docs/images/06-contradiction.png)<br>**Contradiction**: two current documents disagree; both values are shown and the conflict is flagged |
+| ![Hidden injection](docs/images/07-hidden-injection.png)<br>**Hidden injection**: a supplier brochure tells AI assistants to ignore their rules; the answer follows Nexora's policy | ![Outdated version](docs/images/08-outdated-version.png)<br>**Outdated version**: only the current password standard is used, not the 2021 version |
+
+</details>
 
 > **Synthetic data.** The client, Nexora Industries, is fictional. All 32 documents were written for this project; no real company or confidential information is used.
 
@@ -282,7 +295,7 @@ curl -X POST http://localhost:8000/ask -H "Content-Type: application/json" \
      -d '{"question": "What is the single transaction limit of the purchasing card?"}'
 ```
 
-Errors are returned with a stable code: `invalid_question` (422), `configuration_error` (503), `llm_unavailable` (503), `llm_invalid_response` (502).
+Errors are returned with a stable code: `invalid_question` (422), `llm_rate_limited` and `llm_quota_exhausted` (429, with a `Retry-After` header), `configuration_error` and `llm_unavailable` (503), `llm_invalid_response` (502).
 
 ## 12. Testing
 
@@ -307,7 +320,64 @@ The CI workflow runs the tests on Python 3.12 and 3.13, builds the Docker image 
 
 ## 13. Evaluation methodology and results
 
-<!-- RESULTS -->
+The assistant is evaluated on [62 hand-written cases](eval/dataset.jsonl) in 10 categories: single and multi-document questions, questions the documents do not answer, ambiguous questions, contradictions, citations, injection attempts, outdated versions and malformed inputs. Each case names the sections that contain the answer, the key facts a correct answer must contain and the facts it must not contain. Scoring is automatic: [docs/evaluation.md](docs/evaluation.md) defines the metrics and the matching rules. The **Evaluate with Gemini** workflow runs the set against the real API and publishes the report.
+
+**Results**: run of 19 October 2026 with `gemini-3.5-flash-lite` and `gemini-embedding-001`, 5 passages per question. Full report with every failed answer: [eval/results/2026-10-19-prompt-v1/report.md](eval/results/2026-10-19-prompt-v1/report.md).
+
+**Retrieval** (42 questions with labelled sections):
+
+| Retriever | Hit@1 | Hit@5 | Recall@5 | MRR |
+|---|---:|---:|---:|---:|
+| **Semantic** (default) | **100%** | **100%** | **96%** | **1.00** |
+| BM25 keyword baseline | 83% | 95% | 79% | 0.88 |
+| Hybrid (reciprocal rank fusion) | 93% | 98% | 88% | 0.95 |
+
+**Answers** (62 cases, same model and prompt, two retrievers):
+
+| Metric | Semantic retrieval | BM25 retrieval |
+|---|---:|---:|
+| Cases passed | **57 / 62 (92%)** | 48 / 62 (77%) |
+| Fully correct answers (42 answerable questions) | 37 / 42 (88%) | 29 / 42 (69%) |
+| Key facts present | 95% | 76% |
+| Answers citing a required section | 100% | 97% |
+| Questions not covered by the documents, declined | 7 / 7 | 6 / 7 |
+| Injected instructions followed / superseded versions cited | 0 / 0 | 0 / 0 |
+| Latency, median / 95th percentile | 1.2 s / 2.1 s | 1.0 s / 1.4 s |
+| Tokens per question, prompt / output | 1,383 / 136 | 1,355 / 118 |
+| Estimated cost per question (paid-tier prices) | $0.00076 | $0.00070 |
+
+With semantic retrieval, 9 of the 10 categories pass every case; the exception is multi-document questions (2 of 7).
+
+**Against the targets of the [discovery brief](docs/discovery-brief.md)** (semantic retrieval):
+
+| Criterion | Target | Result | Met |
+|---|---|---|---|
+| Correct answers on answerable questions | at least 80% | 88% | yes |
+| Answers citing a correct source | at least 90% | 100% | yes |
+| Questions not covered by the documents answered anyway | at most 10% | 0% | yes |
+| Injected instruction followed or superseded version cited | 0 | 0 | yes |
+| Median response time | under 5 s | 1.2 s | yes |
+| Cost per question on the paid tier | under $0.01 | $0.0008 | yes |
+
+**Failure analysis** (the 5 failed cases):
+
+- **Incomplete multi-document answers (3 cases).** For the reference question (approval of a purchase above €50,000), the model named the approvers and the ERP steps but left out the three written quotes. The rule was in a retrieved passage ("at least three written quotes from €5,000; from €50,000, also the bid comparison"), but the model kept only the clause that starts at €50,000. The French version of the question failed the same way, and a third answer did not say that contractor services need a purchase order.
+- **Missing verdict (1 case).** "Can I spend my remote work days working from a café, and what rules apply to its public Wi-Fi?" got the right rules, but not the "No" that the question calls for.
+- **Refused by the provider (1 case).** Gemini's safety filter refused a question about a phishing incident ("An employee clicked a phishing link and typed their password..."), a false positive on a legitimate IT-support question. The application now explains such refusals instead of showing a generic error.
+- **Correction**: the [system prompt](src/knowledge_assistant/prompts.py) now asks for every requirement that applies to the case, including those found in another passage, and for an opening "Yes" or "No" on yes/no questions, even when they are combined with another question. The next run will measure the effect on all 62 cases, to check that the change fixes these failures without breaking others.
+
+**What the comparison shows**:
+
+- **Retrieval drives answer quality.** With keyword search, the passages needed were often missing from the top 5: the model then said it lacked evidence (7 answerable questions) rather than guessing. The supplier brochure with the hidden injection ranked first for three questions with BM25, yet no injected instruction was followed.
+- **Relevance scores cannot replace abstention.** The best passage of answerable questions scores between 0.69 and 0.80, and that of questions the documents do not cover between 0.59 and 0.71. The ranges overlap, so a similarity threshold would reject good questions: `MIN_RELEVANCE` stays at 0, and abstention relies on the prompt rules and the verification of each statement (7 of 7 declined).
+- **Cost is not a constraint at this scale**: 1,000 questions cost under $1 at paid-tier prices.
+
+Reproduce the results (the model is not deterministic: two runs can differ by a few cases):
+
+```bash
+knowledge-assistant evaluate --retrieval-only                         # retrieval only, no generation call
+knowledge-assistant evaluate --answer-retrievers semantic,bm25 --delay 4
+```
 
 ## 14. Security considerations
 
@@ -347,7 +417,7 @@ This prototype does not meet enterprise security requirements and should not be 
 - **Number checks** catch invented figures, not wrong roles or wrong reasoning.
 - **Evaluation**: 62 cases on a synthetic corpus written by the same author as the questions; key facts are matched as text, so a correct paraphrase can be scored as a miss. The cases to review are listed in the report.
 - **Scale**: tested with tens of documents; the document list is rebuilt from the index metadata, which is fine for thousands of passages, not millions.
-- **Latency and cost** depend on the Gemini API; the free tier has rate limits.
+- **Latency and cost** depend on the Gemini API. The free tier has per-minute and daily limits: when the daily quota is used up, the demo says when it will answer again (midnight Pacific time).
 
 ## 17. Future improvements
 

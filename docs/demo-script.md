@@ -32,4 +32,4 @@ Setting: the public demo (or a local run with the sample documents loaded). Spea
 
 "Every behaviour you saw is measured on 62 labelled cases: correct answers, citations, abstentions, contradictions, outdated versions, and a supplier PDF with hidden instructions. The report, including the failures, is in the repository, along with the limits: no authentication yet, and no OCR."
 
-**Fallback if the API is rate-limited**: show the screenshots in the README and the evaluation report, and explain the error message the user sees ("temporarily unavailable, wait a minute").
+**Fallback if the API is rate-limited**: show the screenshots in the README and the evaluation report, and explain the message the user sees: after a per-minute limit, the application waits and retries; when the daily quota is used up, it says at what time the demo will answer again.
