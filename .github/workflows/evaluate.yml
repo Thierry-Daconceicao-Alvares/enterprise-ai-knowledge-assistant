@@ -41,6 +41,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANSWER_RETRIEVERS: ${{ inputs.answer_retrievers }}
           DELAY: ${{ inputs.delay }}
+          MAX_RETRIES: "6"  # free-tier rate limits: retry with backoff instead of failing
         run: |
           knowledge-assistant evaluate --answer-retrievers "$ANSWER_RETRIEVERS" \
             --delay "$DELAY" --output eval/results/latest
@@ -48,6 +49,7 @@ jobs:
         if: ${{ inputs.screenshots }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MAX_RETRIES: "6"
         run: |
           pip install playwright==1.64.0
           playwright install --with-deps chromium
