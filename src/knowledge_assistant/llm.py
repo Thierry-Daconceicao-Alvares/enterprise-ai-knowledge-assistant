@@ -97,7 +97,11 @@ def _parse_payload(response: types.GenerateContentResponse) -> AnswerPayload:
     if not response.candidates:
         feedback = response.prompt_feedback
         reason = feedback.block_reason if feedback else None
-        raise LLMResponseError(f"The model returned no answer (block reason: {reason}).")
+        name = getattr(reason, "name", reason)
+        raise LLMResponseError(
+            f"The model provider's safety filter refused this request ({name}). "
+            "Try rephrasing the question."
+        )
     finish_reason = response.candidates[0].finish_reason
     text = response.text
     if not text:

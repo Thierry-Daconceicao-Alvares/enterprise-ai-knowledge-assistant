@@ -7,7 +7,7 @@ from conftest import SAMPLE_DIR, make_settings
 from fake_gemini_server import FakeGemini
 
 from knowledge_assistant.embeddings import GeminiEmbedder
-from knowledge_assistant.errors import LLMRequestError, LLMUnavailableError
+from knowledge_assistant.errors import LLMRequestError, LLMResponseError, LLMUnavailableError
 from knowledge_assistant.factory import build_components
 from knowledge_assistant.ingestion import MemoryStorage
 
@@ -88,3 +88,12 @@ def test_rejected_key_is_a_configuration_error(fake_api, tmp_path):
     fake_api.fail_next = [400]
     with pytest.raises(LLMRequestError, match="API key"):
         components.ingestion.ingest_bytes("a.txt", b"The canteen opens at 11:30 every working day.")
+
+
+def test_a_safety_block_is_reported_clearly(fake_api, tmp_path):
+    """Observed in the evaluation: the provider refused a question about a phishing incident."""
+    components = _components(fake_api, tmp_path)
+    components.ingestion.ingest_bytes("a.txt", b"Report phishing with the Report phishing button.")
+    fake_api.block_next = True
+    with pytest.raises(LLMResponseError, match="safety filter refused this request"):
+        components.assistant.ask("What should I do after clicking a phishing link?")

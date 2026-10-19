@@ -448,11 +448,8 @@ def ask(question: str) -> None:
         )
     except LLMRequestError as exc:
         entry["error"] = ("error", f"The model API rejected the request: {exc}")
-    except LLMResponseError:
-        entry["error"] = (
-            "error",
-            "The model returned an answer that could not be read. Please ask again.",
-        )
+    except LLMResponseError as exc:
+        entry["error"] = ("error", f"The model did not return a usable answer: {exc}")
     state.history.append(entry)
 
 
@@ -493,7 +490,7 @@ if not state.history and documents:
                 st.rerun()
 
 for index, entry in enumerate(state.history):
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar=":material/person:"):
         st.markdown(md_escape(entry["question"]))
     with st.chat_message("assistant", avatar=":material/menu_book:"):
         if "answer" in entry:

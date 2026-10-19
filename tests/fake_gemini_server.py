@@ -23,6 +23,7 @@ class FakeGemini:
     def __init__(self) -> None:
         self.requests: list[tuple[str, dict]] = []
         self.fail_next: list[int] = []  # HTTP status codes to return before succeeding
+        self.block_next = False  # answer the next generation with a safety block
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
 
@@ -86,7 +87,10 @@ class FakeGemini:
                     message = "API key not valid." if status == 400 else "failure"
                     self._send(status, {"error": {"code": status, "message": message}})
                     return
-                if self.path.endswith(":generateContent"):
+                if self.path.endswith(":generateContent") and fake.block_next:
+                    fake.block_next = False
+                    self._send(200, {"promptFeedback": {"blockReason": "PROHIBITED_CONTENT"}})
+                elif self.path.endswith(":generateContent"):
                     prompt = _text_of(body["contents"][0])
                     text = json.dumps(fake.answer(prompt))
                     self._send(
