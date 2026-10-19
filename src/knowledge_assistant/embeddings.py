@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import itertools
 from collections.abc import Sequence
+from functools import partial
 from typing import Protocol
 
 import numpy as np
@@ -19,7 +20,7 @@ from google import genai
 from google.genai import types
 
 from .errors import LLMResponseError
-from .gemini import gemini_errors
+from .gemini import call
 from .text import tokenize
 
 
@@ -50,12 +51,18 @@ class GeminiEmbedder:
     are not normalised by the API, so they are normalised here."""
 
     def __init__(
-        self, client: genai.Client, model_name: str, dimensions: int, batch_size: int = 50
+        self,
+        client: genai.Client,
+        model_name: str,
+        dimensions: int,
+        batch_size: int = 50,
+        max_retries: int = 3,
     ) -> None:
         self._client = client
         self.model_name = model_name
         self.dimensions = dimensions
         self._batch_size = batch_size
+        self._max_retries = max_retries
         self._query_cache: dict[str, np.ndarray] = {}
 
     @property
@@ -63,17 +70,19 @@ class GeminiEmbedder:
         return f"{self.model_name}-{self.dimensions}"
 
     def _embed(self, texts: Sequence[str], task_type: str) -> np.ndarray:
+        config = types.EmbedContentConfig(
+            task_type=task_type, output_dimensionality=self.dimensions
+        )
         vectors: list[list[float]] = []
         for start in range(0, len(texts), self._batch_size):
             batch = list(texts[start : start + self._batch_size])
-            with gemini_errors("embedding"):
-                response = self._client.models.embed_content(
-                    model=self.model_name,
-                    contents=batch,
-                    config=types.EmbedContentConfig(
-                        task_type=task_type, output_dimensionality=self.dimensions
-                    ),
-                )
+            request = partial(
+                self._client.models.embed_content,
+                model=self.model_name,
+                contents=batch,
+                config=config,
+            )
+            response = call("embedding", request, self._max_retries)
             embeddings = response.embeddings or []
             if len(embeddings) != len(batch):
                 raise LLMResponseError(

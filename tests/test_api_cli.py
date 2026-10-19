@@ -1,11 +1,17 @@
 """HTTP API and command-line interface."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from conftest import FIXTURES, SAMPLE_DIR, FakeGenerator, answered, make_settings, new_store
 from fastapi.testclient import TestClient
 
 from knowledge_assistant import api, cli
-from knowledge_assistant.errors import LLMUnavailableError
+from knowledge_assistant.errors import (
+    LLMQuotaExhaustedError,
+    LLMRateLimitError,
+    LLMUnavailableError,
+)
 from knowledge_assistant.factory import build_components
 from knowledge_assistant.ingestion import MemoryStorage
 
@@ -64,6 +70,23 @@ def test_api_errors_are_mapped(client):
     assert response.status_code == 503 and response.json()["error"] == "llm_unavailable"
 
 
+def test_quota_errors_are_http_429_with_retry_after(client):
+    test_client, components = client
+    components.ingestion.ingest_bytes("a.txt", b"The canteen opens at 11:30 every working day.")
+    question = {"question": "When does the canteen open?"}
+
+    components.assistant.generator = FakeGenerator(LLMRateLimitError("slow down", 12.4))
+    response = test_client.post("/ask", json=question)
+    assert response.status_code == 429 and response.json()["error"] == "llm_rate_limited"
+    assert response.headers["Retry-After"] == "13"
+
+    resets_at = datetime.now(UTC) + timedelta(hours=2)
+    components.assistant.generator = FakeGenerator(LLMQuotaExhaustedError("used up", resets_at))
+    response = test_client.post("/ask", json=question)
+    assert response.status_code == 429 and response.json()["error"] == "llm_quota_exhausted"
+    assert 7000 < int(response.headers["Retry-After"]) <= 7200
+
+
 @pytest.fixture
 def cli_env(tmp_path, monkeypatch):
     monkeypatch.setenv("EMBEDDING_PROVIDER", "local")
@@ -110,3 +133,26 @@ def test_cli_retrieval_evaluation(cli_env, tmp_path, monkeypatch, capsys):
     assert code == 0
     assert (output / "report.md").exists()
     assert "bm25" in capsys.readouterr().out
+
+
+def test_cli_evaluation_stopped_by_the_daily_quota(cli_env, tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(
+        cli,
+        "build_eval_index",
+        lambda store, ingestion, folder: ingestion.ingest_folder(SAMPLE_DIR),
+    )
+    build_components = cli.build_components
+
+    def components_with_quota_error(*args, **kwargs):
+        components = build_components(*args, **kwargs)
+        components.assistant.generator = FakeGenerator(LLMQuotaExhaustedError("quota used up"))
+        return components
+
+    monkeypatch.setattr(cli, "build_components", components_with_quota_error)
+    monkeypatch.setenv("GITHUB_SHA", "0123456789abcdef")
+    output = tmp_path / "report"
+    arguments = ["--retrievers", "bm25", "--answer-retrievers", "bm25", "--output", str(output)]
+    assert cli.main(["evaluate", *arguments]) == 1
+    assert "Error (evaluation_incomplete)" in capsys.readouterr().err
+    report = (output / "report.md").read_text(encoding="utf-8")
+    assert "Run incomplete" in report and "Commit: 0123456789ab" in report

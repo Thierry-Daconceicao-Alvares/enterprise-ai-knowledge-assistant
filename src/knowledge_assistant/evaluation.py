@@ -29,7 +29,13 @@ from pathlib import Path
 
 from .assistant import AssistantAnswer, KnowledgeAssistant
 from .config import PROJECT_ROOT
-from .errors import DocumentError, InvalidQuestionError, LLMError, LLMRequestError
+from .errors import (
+    DocumentError,
+    InvalidQuestionError,
+    LLMError,
+    LLMQuotaExhaustedError,
+    LLMRequestError,
+)
 from .ingestion import REJECTED, IngestionService
 from .llm import ANSWERED, CLARIFICATION_NEEDED
 from .retrieval import Retriever
@@ -459,9 +465,13 @@ def evaluate_answers(
                     checks=case.checks,
                     facts_found=[False] * len(case.checks),
                 )
-                if consecutive_errors >= max_consecutive_errors:
-                    results.append(result)
+                if isinstance(exc, LLMQuotaExhaustedError):
+                    # No other case can succeed before the quota resets.
+                    aborted = f"stopped because the daily quota is used up ({exc})"
+                elif consecutive_errors >= max_consecutive_errors:
                     aborted = f"stopped after {consecutive_errors} consecutive errors ({exc})"
+                if aborted:
+                    results.append(result)
                     logger.error("Evaluation %s", aborted)
                     break
             else:

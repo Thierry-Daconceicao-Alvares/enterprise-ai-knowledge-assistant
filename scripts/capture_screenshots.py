@@ -47,14 +47,30 @@ def wait_for(url: str, timeout_s: float = 90) -> None:
     raise TimeoutError(f"{url} did not answer within {timeout_s} s")
 
 
+def stop_if_quota_used_up(page: Page) -> None:
+    """A used-up daily quota only comes back the next day: stop at once."""
+    message = page.get_by_text("daily quota")
+    if message.count():
+        raise RuntimeError(message.first.inner_text())
+
+
+def load_samples(page: Page) -> None:
+    page.get_by_role("button", name="Load the 32 sample documents").click()
+    ready, failed = page.get_by_text("Try an example"), page.get_by_text("Indexing failed")
+    ready.or_(failed).first.wait_for(timeout=180_000)
+    if failed.count():
+        raise RuntimeError(failed.first.inner_text())
+
+
 def wait_for_answer(page: Page, count: int, timeout_ms: int = 240_000) -> bool:
     """Wait until `count` answers are displayed. Returns False when the app
-    shows an error instead (for example a free-tier rate limit)."""
+    shows a temporary error instead (for example a per-minute rate limit)."""
     deadline = time.monotonic() + timeout_ms / 1000
     while time.monotonic() < deadline:
         if sum(page.get_by_text(text).count() for text in STATUS_TEXTS) >= count:
             page.wait_for_timeout(1500)
             return True
+        stop_if_quota_used_up(page)
         if page.get_by_text("temporarily unavailable").count():
             return False
         page.wait_for_timeout(500)
@@ -119,8 +135,7 @@ def main() -> int:
             )
             page = browser.new_page(viewport={"width": 1400, "height": 900}, device_scale_factor=1)
             page.goto(f"http://127.0.0.1:{port}/", wait_until="networkidle")
-            page.get_by_role("button", name="Load the 32 sample documents").click()
-            page.get_by_text("Try an example").wait_for(timeout=180_000)
+            load_samples(page)
             page.wait_for_timeout(1500)
 
             def shot(name: str, full_page: bool = False) -> Path:

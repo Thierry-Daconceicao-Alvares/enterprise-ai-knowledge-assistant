@@ -1,7 +1,9 @@
 # Runs the evaluation set against the Gemini API and captures the README
 # screenshots. Started manually; needs the GEMINI_API_KEY repository secret.
 # The report and the screenshots are uploaded as an artifact and, when
-# "publish" is checked, committed to eval/results/<date>/ and docs/images/.
+# "publish" is checked, committed to eval/results/<date>[-<label>]/ and
+# docs/images/. On the free tier, plan one run per day: a run embeds about
+# 550 texts and sends about 115 generation requests (see docs/evaluation.md).
 name: Evaluate with Gemini
 
 on:
@@ -25,6 +27,10 @@ on:
         description: Commit the report and the screenshots to the repository
         type: boolean
         default: true
+      label:
+        description: Suffix of the results folder, for example prompt-v2 (optional)
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -49,19 +55,24 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANSWER_RETRIEVERS: ${{ inputs.answer_retrievers }}
           DELAY: ${{ inputs.delay }}
-          MAX_RETRIES: "6"  # free-tier rate limits: retry with backoff instead of failing
+          MAX_RETRIES: "6"  # per-minute rate limits: wait and retry; a used-up daily quota stops the run
+          PYTHONUNBUFFERED: "1"
         run: |
-          knowledge-assistant evaluate --answer-retrievers "$ANSWER_RETRIEVERS" \
+          bash scripts/annotate_failure.sh "Evaluation failed" \
+            knowledge-assistant evaluate --answer-retrievers "$ANSWER_RETRIEVERS" \
             --delay "$DELAY" --output eval/results/latest
       - name: Capture the screenshots
+        id: screenshots
         if: ${{ inputs.screenshots }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           MAX_RETRIES: "6"
+          PYTHONUNBUFFERED: "1"
         run: |
           pip install playwright==1.64.0
           playwright install --with-deps chromium
-          python scripts/capture_screenshots.py --output docs/images
+          bash scripts/annotate_failure.sh "Screenshots failed" \
+            python scripts/capture_screenshots.py --output docs/images
       - name: Upload the results
         if: always()
         uses: actions/upload-artifact@v7
@@ -73,18 +84,23 @@ jobs:
           if-no-files-found: warn
       - name: Publish the results to the repository
         # Also when the screenshots failed: the report is still worth keeping.
+        # The screenshots are only committed when all of them were captured.
         if: ${{ !cancelled() && inputs.publish && steps.evaluation.outcome == 'success' }}
         env:
           AUTHOR_NAME: Thierry Daconceição Alvares
           AUTHOR_EMAIL: 91541305+Thierry-Daconceicao-Alvares@users.noreply.github.com
+          LABEL: ${{ inputs.label }}
+          SCREENSHOTS: ${{ steps.screenshots.outcome }}
         run: |
-          day=$(date -u +%F)
-          mkdir -p "eval/results/$day"
-          cp eval/results/latest/report.md eval/results/latest/results.json "eval/results/$day/"
+          folder=$(date -u +%F)
+          label=$(printf '%s' "$LABEL" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-*//; s/-*$//')
+          if [ -n "$label" ]; then folder="$folder-$label"; fi
+          mkdir -p "eval/results/$folder"
+          cp eval/results/latest/report.md eval/results/latest/results.json "eval/results/$folder/"
           git config user.name "$AUTHOR_NAME"
           git config user.email "$AUTHOR_EMAIL"
-          git add "eval/results/$day"
-          if [ -d docs/images ]; then git add docs/images; fi
-          git commit -m "Add the evaluation results of $day"
+          git add "eval/results/$folder"
+          if [ "$SCREENSHOTS" = "success" ]; then git add docs/images; fi
+          git commit -m "Add the evaluation results of $folder"
           git pull --rebase origin main
           git push origin HEAD:main

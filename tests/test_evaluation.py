@@ -5,7 +5,11 @@ import pytest
 from conftest import EVAL_SET, FakeGenerator, abstained, answered, make_assistant, make_settings
 
 from knowledge_assistant.assistant import AnswerStatement, AssistantAnswer, SourcePassage
-from knowledge_assistant.errors import LLMRequestError, LLMUnavailableError
+from knowledge_assistant.errors import (
+    LLMQuotaExhaustedError,
+    LLMRequestError,
+    LLMUnavailableError,
+)
 from knowledge_assistant.evaluation import (
     CATEGORIES,
     EvalCase,
@@ -223,6 +227,14 @@ def test_temporary_errors_are_recorded_and_configuration_errors_stop(sample_stor
     assistant.generator = FakeGenerator(LLMRequestError("API key rejected"))
     with pytest.raises(LLMRequestError):
         evaluate_answers(assistant, first)
+
+
+def test_a_used_up_daily_quota_stops_the_evaluation_at_once(sample_store, cases):
+    first = [case for case in cases if case.id == "SD-01"] * 3
+    assistant, _ = make_assistant(sample_store, LLMQuotaExhaustedError("daily quota used up"))
+    report = evaluate_answers(assistant, first, max_consecutive_errors=5)
+    assert [case.status for case in report.cases] == ["error"]
+    assert report.aborted and "daily quota" in report.aborted
 
 
 def test_report_files(tmp_path, sample_store, bm25, cases):

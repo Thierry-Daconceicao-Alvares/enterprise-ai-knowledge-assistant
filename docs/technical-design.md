@@ -65,7 +65,7 @@ Every chunk carries: document key (SHA-256 prefix), file name and type, title, d
 | `GET /health` | - | status, version | - |
 | `GET /documents` | - | document list with statuses, passage count | - |
 | `POST /documents` | multipart file (limit read before parsing) | ingestion result | 422 with error code for rejected files |
-| `POST /ask` | question, `include_superseded` | status, statements, note, citations, retrieved passages, usage, latency, cost | 422 invalid question, 503 configuration or model unavailable, 502 invalid model response |
+| `POST /ask` | question, `include_superseded` | status, statements, note, citations, retrieved passages, usage, latency, cost | 422 invalid question, 429 rate limit or used-up daily quota (with `Retry-After`), 503 configuration or model unavailable, 502 invalid model response |
 
 The API has no authentication in this version; it is meant to run behind a gateway that authenticates users.
 
@@ -96,6 +96,7 @@ The API has no authentication in this version; it is meant to run behind a gatew
 - Per question: one query embedding and one generation call. The system prompt is about 600 tokens and 5 passages (median 316 characters) add about 600 to 1,000 tokens. The evaluation report gives the measured average tokens, latency and cost.
 - Latency is dominated by the generation call; retrieval in Chroma takes milliseconds at this scale.
 - Questions that retrieve nothing (empty index or below the relevance floor) cost no generation call.
+- Free-tier budget: an evaluation run with two answer retrievers embeds about 300 texts (the passages, then each question once) and sends about 110 generation requests. Daily quotas reset at midnight Pacific time.
 
 ## 8. Risks and mitigations
 
@@ -107,5 +108,5 @@ The API has no authentication in this version; it is meant to run behind a gatew
 | Contradictory documents | Prompt rule to report both; evaluation category | Model picks one version silently |
 | Prompt injection in documents | Escaping, untrusted labels, detection patterns, output checks, evaluation | New attack phrasings |
 | Confidential data exposure | No content in logs; per-session uploads in the public demo | No access control yet (major blocker for real data) |
-| Model API outage or rate limit | Retries with backoff, clear errors, abstention without model call when possible | Service unavailable during outages |
+| Model API outage, rate limit or used-up quota | Timeouts and server errors retried with backoff; a per-minute rate limit retried after the delay the API asks for; a used-up daily quota reported at once with its reset time; abstention without model call when possible | Service unavailable during outages or until the daily quota resets |
 | Extraction errors (tables, scans) | PDFium, tests on real layouts, rejection of scans | Complex tables flattened |

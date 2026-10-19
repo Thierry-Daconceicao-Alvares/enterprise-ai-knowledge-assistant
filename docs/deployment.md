@@ -45,7 +45,7 @@ Steps:
 
 4. Deploy. Streamlit installs `requirements.txt`, which installs the package with its pinned dependencies.
 
-Use a key from a Google Cloud project without billing, so that the demo can only use the free tier and cannot generate costs. When the free-tier quota is exhausted, visitors see a "temporarily unavailable" message.
+Use a key from a Google Cloud project without billing, so that the demo can only use the free tier and cannot generate costs. The demo embeds the 239 passages of the sample documents when it starts, then sends one embedding and one generation request per question. When the daily free-tier quota is used up, visitors are told when the demo will answer again (the quota resets at midnight Pacific time). Quotas are counted per Google Cloud project: an evaluation run with the same key reduces what is left for visitors that day, while a key from a separate project keeps the demo independent.
 
 ## Production rollout plan
 

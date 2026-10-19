@@ -60,4 +60,8 @@ knowledge-assistant evaluate --delay 4                      # full run on the fr
 knowledge-assistant evaluate --answer-retrievers semantic,bm25 --delay 4
 ```
 
-Each run indexes the sample documents in a fresh in-memory index, so the results do not depend on the local index. The report is written to `eval/results/latest/report.md` and `results.json`. The **Evaluate with Gemini** workflow (GitHub Actions, started manually) runs the same command with the repository secret and uploads the report.
+Each run indexes the sample documents in a fresh in-memory index, so the results do not depend on the local index. The report is written to `eval/results/latest/report.md` and `results.json`, with the models and settings of the run.
+
+The **Evaluate with Gemini** workflow (GitHub Actions, started manually) runs the same command with the repository secret and records the evaluated commit in the report. It can also capture the README screenshots and commit the results to `eval/results/<date>-<label>/`. When a run fails, the reason appears in the run summary.
+
+**API usage.** With `--answer-retrievers semantic,bm25`, a run sends about 110 generation requests and embeds about 300 texts: the 239 passages in 5 batch requests, then each question once (question vectors are cached, so the retrieval and answer evaluations share them). The screenshot step indexes the documents again. On the free tier, plan one full run per day: daily quotas reset at midnight Pacific time. When the daily quota is used up, the run stops at once and says so instead of recording 62 errors.

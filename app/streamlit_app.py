@@ -18,6 +18,7 @@ from knowledge_assistant.errors import (
     ConfigurationError,
     IndexMismatchError,
     InvalidQuestionError,
+    LLMQuotaExhaustedError,
     LLMRequestError,
     LLMResponseError,
     LLMUnavailableError,
@@ -76,6 +77,19 @@ def md_escape(text: str) -> str:
     """Show text literally: document passages and model output are data, so
     their characters must not be interpreted as Markdown (or as LaTeX with $)."""
     return _MARKDOWN_SPECIAL.sub(r"\\\1", text)
+
+
+def error_text(exc: AssistantError, public_demo: bool) -> str:
+    """The message to show for an error. Visitors of the public demo cannot
+    change its API key, so a used-up daily quota tells them when to come back."""
+    if not (public_demo and isinstance(exc, LLMQuotaExhaustedError)):
+        return str(exc)
+    when = f"at {exc.resets_at:%H:%M} UTC" if exc.resets_at else "at midnight Pacific time"
+    return (
+        "The public demo has used up the daily quota of its Gemini API key. It resets "
+        f"{when}: please come back then. Meanwhile, the source code page shows screenshots "
+        "and the evaluation results."
+    )
 
 
 def load_settings() -> Settings:
@@ -161,11 +175,8 @@ except IndexMismatchError as exc:
     st.stop()
 except AssistantError as exc:  # for example the API quota while indexing the demo documents
     st.title("Nexora Knowledge Assistant")
-    st.error(
-        "The assistant could not start because the language model API did not answer "
-        f"({exc.code}). This usually means the free-tier quota is exhausted: try again in a "
-        "minute."
-    )
+    st.error(f"The assistant could not start. {error_text(exc, settings.public_demo)}")
+    st.caption(f"[Source code, screenshots and evaluation results]({REPOSITORY_URL})")
     st.stop()
 
 store = components.store
@@ -185,7 +196,8 @@ def ingest_uploads(files) -> None:
         try:
             result = ingestion.ingest_bytes(uploaded.name, uploaded.getvalue())
         except AssistantError as exc:
-            results.append(("error", uploaded.name, f"Indexing failed: {exc}"))
+            message = error_text(exc, settings.public_demo)
+            results.append(("error", uploaded.name, f"Indexing failed: {message}"))
             continue
         if result.status == "rejected":
             results.append(("error", result.file_name, result.message))
@@ -440,6 +452,8 @@ def ask(question: str) -> None:
         entry["error"] = ("warning", str(exc))
     except ConfigurationError as exc:
         entry["error"] = ("error", str(exc))
+    except LLMQuotaExhaustedError as exc:
+        entry["error"] = ("error", error_text(exc, settings.public_demo))
     except LLMUnavailableError:
         entry["error"] = (
             "error",

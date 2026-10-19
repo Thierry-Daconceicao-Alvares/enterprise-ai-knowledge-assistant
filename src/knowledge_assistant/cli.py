@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -176,6 +177,8 @@ def cmd_evaluate(args: argparse.Namespace, settings: Settings) -> int:
         "top_k": settings.top_k,
         "min_relevance": settings.min_relevance,
     }
+    if os.environ.get("GITHUB_SHA"):  # the evaluated commit, when run in GitHub Actions
+        context["commit"] = os.environ["GITHUB_SHA"][:12]
     answer_reports = []
     if not args.retrieval_only:
         components = build_components(
@@ -207,7 +210,11 @@ def cmd_evaluate(args: argparse.Namespace, settings: Settings) -> int:
 
     path = write_report(args.output, retrieval_reports, answer_reports, context=context)
     print(f"\nReport written to {path}")
-    return 1 if any(report.aborted for report in answer_reports) else 0
+    aborted = next((report.aborted for report in answer_reports if report.aborted), None)
+    if aborted:
+        print(f"Error (evaluation_incomplete): the evaluation {aborted}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def _choices(raw: str) -> list[str]:

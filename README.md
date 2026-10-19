@@ -99,7 +99,7 @@ The Markdown sources are in [`data/sample_documents_src/`](data/sample_documents
 | Citations | File, page or page range, section, relevance score, passage text, original file download and rendered PDF page |
 | Interfaces | Streamlit web app, command line (`knowledge-assistant`), HTTP API (`/ask`, `/documents`) |
 | Evaluation | 62 labelled cases, deterministic scoring, Markdown and JSON reports, comparison with BM25 |
-| Engineering | 217 automated tests (offline), GitHub Actions CI, Docker image, structured JSON logs without document content |
+| Engineering | 227 automated tests (offline), GitHub Actions CI, Docker image, structured JSON logs without document content |
 
 ## 5. Architecture
 
@@ -165,7 +165,7 @@ The [technical design document](docs/technical-design.md) explains the data flow
 | Baseline | rank-bm25 | Simple keyword ranking to compare against semantic search |
 | Interface | Streamlit | Fast to build, easy for a reviewer to use |
 | API | FastAPI | Typed HTTP endpoints for integration with other tools |
-| Quality | pytest, ruff, GitHub Actions | 217 offline tests, lint and format checks on every push |
+| Quality | pytest, ruff, GitHub Actions | 227 offline tests, lint and format checks on every push |
 | Packaging | Docker, Streamlit Community Cloud | Reproducible run and a public demo |
 
 The model provider is isolated behind small interfaces (`AnswerGenerator`, `Embedder`), so another provider (OpenAI, Azure OpenAI, a local model) can be added without changing the pipeline. Dependency versions are pinned in [`pyproject.toml`](pyproject.toml) and reviewed in [docs/dependencies.md](docs/dependencies.md).
@@ -212,7 +212,8 @@ docker run -p 8501:8501 -e GEMINI_API_KEY=your-key -v ka-index:/app/data/index k
 | Symptom | Fix |
 |---|---|
 | "GEMINI_API_KEY is not set" | Create `.env` from `.env.example` and paste the key, then restart |
-| "rate limit or quota exceeded (HTTP 429)" | Free-tier limit: wait a minute; for the evaluation use `--delay 4` |
+| "rate limit reached (HTTP 429)" | Per-minute free-tier limit: the application waits and retries; for the evaluation use `--delay 4` |
+| "the daily quota of this API key ... is used up" | The message gives the reset time (midnight Pacific time). Until then, use a key from another Google Cloud project or enable billing |
 | "The index was built with ..." | You changed the embedding model: run `knowledge-assistant rebuild --samples` |
 | A PDF is rejected with "no extractable text" | It is a scanned document; OCR is not supported in this version |
 | `pip` cannot install a dependency | Use Python 3.12 or 3.13 and upgrade pip (`python -m pip install -U pip`) |
@@ -235,6 +236,7 @@ Settings are read from environment variables or a `.env` file (see [`.env.exampl
 | `MAX_FILE_MB` / `MAX_PAGES` | `10` / `300` | Upload limits |
 | `DATA_DIR` | `data` | Location of the index (`data/index`) and stored files (`data/storage`) |
 | `PUBLIC_DEMO` | `false` | Per-visitor uploads and question limits for a public deployment |
+| `REQUEST_TIMEOUT_S` / `MAX_RETRIES` | `60` / `3` | Timeout of a Gemini request; retries after a timeout, a server error or a per-minute rate limit |
 | `LOG_LEVEL` / `LOG_CONTENT` | `INFO` / `false` | Logs never contain questions or documents unless `LOG_CONTENT=true` |
 
 **Trade-offs.** Smaller chunks make retrieval more precise but give the model less context; larger chunks do the opposite and cost more tokens. Overlap keeps a rule readable when it is cut between two chunks, at the cost of some duplicated text. A higher `TOP_K` improves the chance of retrieving all the evidence for multi-document questions, but adds noise and tokens. Changing the chunking or the embedding model requires rebuilding the index; embedding the 32 sample documents (239 passages) costs a few API calls.
@@ -285,11 +287,11 @@ Errors are returned with a stable code: `invalid_question` (422), `configuration
 ## 12. Testing
 
 ```bash
-pytest                  # 217 tests, offline, about 20 seconds
+pytest                  # 227 tests, offline, about 25 seconds
 ruff check . && ruff format --check .
 ```
 
-The tests never call a paid API. They use the real sample documents, an in-memory Chroma index with offline embeddings, a scripted model for the answer pipeline, and a local fake of the Gemini HTTP API to exercise the real SDK (request format, JSON schema, retries, error handling).
+The tests never call a paid API. They use the real sample documents, an in-memory Chroma index with offline embeddings, a scripted model for the answer pipeline, and a local fake of the Gemini HTTP API to exercise the real SDK (request format, JSON schema, retries, rate limits and daily quotas, error handling).
 
 | Area | What is tested |
 |---|---|
@@ -366,7 +368,7 @@ This prototype does not meet enterprise security requirements and should not be 
 - Treating hallucination as an engineering problem: answers are verified by code, not trusted because of a prompt.
 - Handling the messy parts of real document bases: outdated versions, contradictions, hidden instructions, malformed files.
 - Measuring quality with a labelled evaluation set, comparing against a baseline and reporting failures honestly.
-- Professional engineering practices: typed modules, 217 automated tests, CI, Docker, configuration and secrets management, structured logging, documentation.
+- Professional engineering practices: typed modules, 227 automated tests, CI, Docker, configuration and secrets management, structured logging, documentation.
 - Customer-facing work of a Forward Deployed Engineer: [discovery brief](docs/discovery-brief.md), [technical design](docs/technical-design.md), [implementation plan](docs/implementation-plan.md), [demo script](docs/demo-script.md).
 
 ## Project structure

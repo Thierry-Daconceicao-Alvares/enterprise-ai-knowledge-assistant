@@ -34,7 +34,12 @@ def build_embedder(settings: Settings, client: genai.Client | None = None) -> Em
     if settings.embedding_provider == "local":
         return LocalHashEmbedder()
     client = client or make_client(settings)  # raises ConfigurationError without a key
-    return GeminiEmbedder(client, settings.embedding_model, settings.embedding_dimensions)
+    return GeminiEmbedder(
+        client,
+        settings.embedding_model,
+        settings.embedding_dimensions,
+        max_retries=settings.max_retries,
+    )
 
 
 def build_store(settings: Settings, embedder: Embedder, persistent: bool = True) -> ChromaStore:
@@ -90,6 +95,7 @@ def build_components(
             settings.generation_model,
             temperature=settings.temperature,
             thinking_level=settings.thinking_level,
+            max_retries=settings.max_retries,
         )
         if client is not None
         else None

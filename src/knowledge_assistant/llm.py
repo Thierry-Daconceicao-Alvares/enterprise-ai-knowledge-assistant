@@ -16,7 +16,7 @@ from google.genai import types
 from pydantic import BaseModel, Field, ValidationError
 
 from .errors import LLMResponseError
-from .gemini import gemini_errors
+from .gemini import call
 
 ANSWERED = "answered"
 INSUFFICIENT_EVIDENCE = "insufficient_evidence"
@@ -129,11 +129,13 @@ class GeminiGenerator:
         model: str,
         temperature: float | None = None,
         thinking_level: str | None = None,
+        max_retries: int = 3,
     ) -> None:
         self._client = client
         self.model = model
         self._temperature = temperature
         self._thinking_level = thinking_level
+        self._max_retries = max_retries
 
     def generate(self, system_prompt: str, user_prompt: str) -> GenerationResult:
         thinking = (
@@ -149,10 +151,13 @@ class GeminiGenerator:
             thinking_config=thinking,
         )
         start = time.perf_counter()
-        with gemini_errors("generation"):
-            response = self._client.models.generate_content(
+        response = call(
+            "generation",
+            lambda: self._client.models.generate_content(
                 model=self.model, contents=user_prompt, config=config
-            )
+            ),
+            self._max_retries,
+        )
         latency_ms = (time.perf_counter() - start) * 1000
         return GenerationResult(
             payload=_parse_payload(response),

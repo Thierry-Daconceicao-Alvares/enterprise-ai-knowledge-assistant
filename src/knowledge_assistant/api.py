@@ -6,8 +6,10 @@ or behind an authenticating gateway (see the security section of the README).
 
 from __future__ import annotations
 
+import math
 import threading
 from dataclasses import asdict
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Request, UploadFile
@@ -21,6 +23,8 @@ from .errors import (
     ConfigurationError,
     IndexMismatchError,
     InvalidQuestionError,
+    LLMQuotaExhaustedError,
+    LLMRateLimitError,
     LLMRequestError,
     LLMResponseError,
     LLMUnavailableError,
@@ -58,6 +62,8 @@ ERROR_STATUS: dict[type[AssistantError], int] = {
     InvalidQuestionError: 422,
     ConfigurationError: 503,
     IndexMismatchError: 503,
+    LLMQuotaExhaustedError: 429,
+    LLMRateLimitError: 429,
     LLMUnavailableError: 503,
     LLMResponseError: 502,
     LLMRequestError: 500,
@@ -67,7 +73,15 @@ ERROR_STATUS: dict[type[AssistantError], int] = {
 async def _handle_error(_: Request, exc: Exception) -> JSONResponse:
     status = next((code for error, code in ERROR_STATUS.items() if isinstance(exc, error)), 500)
     code = getattr(exc, "code", "error")
-    return JSONResponse(status_code=status, content={"error": code, "detail": str(exc)})
+    headers = {}
+    if isinstance(exc, LLMQuotaExhaustedError) and exc.resets_at:
+        wait_s = (exc.resets_at - datetime.now(UTC)).total_seconds()
+        headers["Retry-After"] = str(max(1, math.ceil(wait_s)))
+    elif isinstance(exc, LLMRateLimitError) and exc.retry_after_s is not None:
+        headers["Retry-After"] = str(max(1, math.ceil(exc.retry_after_s)))
+    return JSONResponse(
+        status_code=status, content={"error": code, "detail": str(exc)}, headers=headers
+    )
 
 
 app.add_exception_handler(AssistantError, _handle_error)

@@ -19,10 +19,43 @@ def _text_of(content: dict) -> str:
     return " ".join(part.get("text", "") for part in content.get("parts", []))
 
 
+def quota_error(
+    quota_id: str, limit: str = "1000", retry_delay: str = "1s", model: str = "gemini-embedding-001"
+) -> tuple[int, dict]:
+    """An HTTP 429 response with the details the Gemini API sends: the
+    violated quota (per minute or per day) and how long to wait."""
+    return 429, {
+        "error": {
+            "code": 429,
+            "message": f"You exceeded your current quota. Quota exceeded for {quota_id}.",
+            "status": "RESOURCE_EXHAUSTED",
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                    "violations": [
+                        {
+                            "quotaMetric": "generativelanguage.googleapis.com/free_tier_requests",
+                            "quotaId": quota_id,
+                            "quotaDimensions": {"location": "global", "model": model},
+                            "quotaValue": limit,
+                        }
+                    ],
+                },
+                {
+                    "@type": "type.googleapis.com/google.rpc.Help",
+                    "links": [{"url": "https://ai.google.dev/gemini-api/docs/rate-limits"}],
+                },
+                {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": retry_delay},
+            ],
+        }
+    }
+
+
 class FakeGemini:
     def __init__(self) -> None:
         self.requests: list[tuple[str, dict]] = []
-        self.fail_next: list[int] = []  # HTTP status codes to return before succeeding
+        # Errors to return before succeeding: an HTTP status, or a status and a body
+        self.fail_next: list[int | tuple[int, dict]] = []
         self.block_next = False  # answer the next generation with a safety block
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
@@ -83,9 +116,10 @@ class FakeGemini:
                 body = json.loads(self.rfile.read(length) or b"{}")
                 fake.requests.append((self.path, body))
                 if fake.fail_next:
-                    status = fake.fail_next.pop(0)
+                    failure = fake.fail_next.pop(0)
+                    status, body = failure if isinstance(failure, tuple) else (failure, None)
                     message = "API key not valid." if status == 400 else "failure"
-                    self._send(status, {"error": {"code": status, "message": message}})
+                    self._send(status, body or {"error": {"code": status, "message": message}})
                     return
                 if self.path.endswith(":generateContent") and fake.block_next:
                     fake.block_next = False

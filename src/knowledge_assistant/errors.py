@@ -6,6 +6,8 @@ and the evaluation, and a message written for the person who has to act on it.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 
 class AssistantError(Exception):
     """Base class for all errors of the application."""
@@ -80,6 +82,28 @@ class LLMUnavailableError(LLMError):
     """Temporary failure: timeout, network error, rate limit or server error."""
 
     code = "llm_unavailable"
+
+
+class LLMRateLimitError(LLMUnavailableError):
+    """A per-minute rate limit was reached: the request can be sent again after
+    `retry_after_s` seconds (None when the API does not say)."""
+
+    code = "llm_rate_limited"
+
+    def __init__(self, message: str, retry_after_s: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after_s = retry_after_s
+
+
+class LLMQuotaExhaustedError(LLMUnavailableError):
+    """The daily quota of the API key is used up. Retrying is pointless until
+    it resets at `resets_at` (None when the time zone database is missing)."""
+
+    code = "llm_quota_exhausted"
+
+    def __init__(self, message: str, resets_at: datetime | None = None) -> None:
+        super().__init__(message)
+        self.resets_at = resets_at
 
 
 class LLMRequestError(LLMError):

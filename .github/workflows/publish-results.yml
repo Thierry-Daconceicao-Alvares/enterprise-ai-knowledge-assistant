@@ -9,13 +9,17 @@ on:
         description: ID of the "Evaluate with Gemini" run (from its URL)
         required: true
       include_results:
-        description: Commit the evaluation report to eval/results/<date>/
+        description: Commit the evaluation report to eval/results/<date>[-<label>]/
         type: boolean
         default: true
       include_images:
         description: Commit the screenshots and the GIF to docs/images/
         type: boolean
         default: true
+      label:
+        description: Suffix of the results folder, for example prompt-v2 (optional)
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -41,14 +45,17 @@ jobs:
           INCLUDE_RESULTS: ${{ inputs.include_results }}
           INCLUDE_IMAGES: ${{ inputs.include_images }}
           RUN_ID: ${{ inputs.run_id }}
+          LABEL: ${{ inputs.label }}
         run: |
           report=$(find artifact -path "*eval/results/latest/report.md" | head -n 1)
           images=$(find artifact -type d -path "*docs/images" | head -n 1)
           if [ "$INCLUDE_RESULTS" = "true" ] && [ -n "$report" ]; then
-            day=$(date -u +%F)
-            mkdir -p "eval/results/$day"
-            cp "$(dirname "$report")"/report.md "$(dirname "$report")"/results.json "eval/results/$day/"
-            git add "eval/results/$day"
+            folder=$(date -u +%F)
+            label=$(printf '%s' "$LABEL" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-*//; s/-*$//')
+            if [ -n "$label" ]; then folder="$folder-$label"; fi
+            mkdir -p "eval/results/$folder"
+            cp "$(dirname "$report")"/report.md "$(dirname "$report")"/results.json "eval/results/$folder/"
+            git add "eval/results/$folder"
           fi
           if [ "$INCLUDE_IMAGES" = "true" ] && [ -n "$images" ]; then
             mkdir -p docs/images

@@ -2,7 +2,7 @@
 
 import pytest
 from conftest import PROJECT_ROOT
-from fake_gemini_server import FakeGemini
+from fake_gemini_server import FakeGemini, quota_error
 from streamlit.testing.v1 import AppTest
 
 APP = str(PROJECT_ROOT / "app" / "streamlit_app.py")
@@ -79,3 +79,15 @@ def test_public_demo_mode_isolates_sessions(app_env, monkeypatch):
     assert first.sidebar.metric[0].value == "2"  # sample documents preloaded
     second = AppTest.from_file(APP, default_timeout=60).run()
     assert first.session_state.index_name != second.session_state.index_name
+
+
+def test_public_demo_explains_a_used_up_daily_quota(app_env, monkeypatch, fake_api):
+    monkeypatch.setenv("PUBLIC_DEMO", "true")
+    # In-memory Chroma collections live as long as the process: use a new one.
+    monkeypatch.setenv("COLLECTION_NAME", "quota-test")
+    fake_api.fail_next = [quota_error("EmbedContentRequestsPerDayPerProjectPerModel-FreeTier")]
+    app = AppTest.from_file(APP, default_timeout=60).run()
+    assert not app.exception
+    message = " ".join(error.value for error in app.error)
+    assert "public demo has used up the daily quota" in message and "UTC" in message
+    assert "github.com" in _text(app)  # where to see the screenshots meanwhile
