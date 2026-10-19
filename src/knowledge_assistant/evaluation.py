@@ -274,6 +274,8 @@ class AnswerCase:
     prompt_tokens: int = 0
     output_tokens: int = 0
     cost_usd: float | None = None
+    top_similarity: float | None = None
+    retrieved: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     error: str | None = None
 
@@ -311,6 +313,10 @@ def score_answer(case: EvalCase, answer: AssistantAnswer) -> AnswerCase:
         prompt_tokens=answer.usage.prompt_tokens,
         output_tokens=answer.usage.output_tokens + answer.usage.thinking_tokens,
         cost_usd=answer.estimated_cost_usd,
+        top_similarity=max(
+            (p.similarity for p in answer.retrieved if p.similarity is not None), default=None
+        ),
+        retrieved=[f"{p.reference or p.file_name} {p.section}" for p in answer.retrieved],
         warnings=list(answer.warnings),
     )
     verdict = [answer_verdict(text) == case.verdict] if case.verdict else []
@@ -601,6 +607,7 @@ def _answer_section(report: AnswerReport) -> list[str]:
             f"| {name} | {cm['cases']} | {_pct(cm['pass_rate'])} | "
             f"{_pct(cm['key_fact_recall'])} | {_pct(cm['citation_precision'])} |"
         )
+    lines += _similarity_lines(report)
     failures = [case for case in report.cases if not case.passed]
     lines += ["", f"### Cases to review ({len(failures)})", ""]
     if not failures:
@@ -630,6 +637,40 @@ def _answer_section(report: AnswerReport) -> list[str]:
         lines.append(f"  - {'; '.join(reasons) or 'see results.json'}")
         if answer:
             lines.append(f"  - Answer: {answer}")
+    return lines
+
+
+def _similarity_lines(report: AnswerReport) -> list[str]:
+    """Top-1 cosine similarity of answerable questions and of questions the
+    documents do not cover: the data needed to choose MIN_RELEVANCE."""
+    groups = {
+        "Answerable questions": [
+            c.top_similarity
+            for c in report.cases
+            if c.expected_behavior == "answer" and c.top_similarity is not None
+        ],
+        "Questions not covered by the documents": [
+            c.top_similarity
+            for c in report.cases
+            if c.category == "no_answer" and c.top_similarity is not None
+        ],
+    }
+    if not any(groups.values()):
+        return []
+    lines = [
+        "",
+        "Top-1 relevance (cosine similarity of the best passage), used to calibrate "
+        "`MIN_RELEVANCE`:",
+        "",
+        "| Questions | Count | Min | Median | Max |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for name, values in groups.items():
+        if values:
+            lines.append(
+                f"| {name} | {len(values)} | {min(values):.2f} | "
+                f"{statistics.median(values):.2f} | {max(values):.2f} |"
+            )
     return lines
 
 
