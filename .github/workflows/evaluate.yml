@@ -1,6 +1,7 @@
 # Runs the evaluation set against the Gemini API and captures the README
 # screenshots. Started manually; needs the GEMINI_API_KEY repository secret.
-# Results are uploaded as an artifact, reviewed, then committed by hand.
+# The report and the screenshots are uploaded as an artifact and, when
+# "publish" is checked, committed to eval/results/<date>/ and docs/images/.
 name: Evaluate with Gemini
 
 on:
@@ -20,6 +21,10 @@ on:
         description: Capture the README screenshots
         type: boolean
         default: true
+      publish:
+        description: Commit the report and the screenshots to the repository
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -28,6 +33,8 @@ jobs:
   evaluate:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: write  # only used by the "Publish" step
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -63,3 +70,19 @@ jobs:
             eval/results/latest
             docs/images
           if-no-files-found: warn
+      - name: Publish the results to the repository
+        if: ${{ inputs.publish }}
+        env:
+          AUTHOR_NAME: Thierry Daconceição Alvares
+          AUTHOR_EMAIL: 91541305+Thierry-Daconceicao-Alvares@users.noreply.github.com
+        run: |
+          day=$(date -u +%F)
+          mkdir -p "eval/results/$day"
+          cp eval/results/latest/report.md eval/results/latest/results.json "eval/results/$day/"
+          git config user.name "$AUTHOR_NAME"
+          git config user.email "$AUTHOR_EMAIL"
+          git add "eval/results/$day"
+          if [ -d docs/images ]; then git add docs/images; fi
+          git commit -m "Add the evaluation results of $day"
+          git pull --rebase origin main
+          git push origin HEAD:main
