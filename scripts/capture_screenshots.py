@@ -47,15 +47,30 @@ def wait_for(url: str, timeout_s: float = 90) -> None:
     raise TimeoutError(f"{url} did not answer within {timeout_s} s")
 
 
-def wait_for_answer(page: Page, count: int, timeout_ms: int = 120_000) -> None:
-    """Wait until `count` answers are displayed."""
+def wait_for_answer(page: Page, count: int, timeout_ms: int = 240_000) -> bool:
+    """Wait until `count` answers are displayed. Returns False when the app
+    shows an error instead (for example a free-tier rate limit)."""
     deadline = time.monotonic() + timeout_ms / 1000
     while time.monotonic() < deadline:
         if sum(page.get_by_text(text).count() for text in STATUS_TEXTS) >= count:
             page.wait_for_timeout(1500)
-            return
+            return True
+        if page.get_by_text("temporarily unavailable").count():
+            return False
         page.wait_for_timeout(500)
     raise TimeoutError("no answer displayed")
+
+
+def ask_until_answered(page: Page, question_start: str, attempts: int = 3) -> None:
+    """Ask an example question; after a rate-limit error, wait and ask again."""
+    for attempt in range(1, attempts + 1):
+        ask_example(page, question_start)
+        if wait_for_answer(page, 1):
+            return
+        print(f"Model unavailable for {question_start!r} (attempt {attempt}); waiting 60 s")
+        clear(page)
+        page.wait_for_timeout(60_000)
+    raise RuntimeError(f"No answer for {question_start!r} after {attempts} attempts")
 
 
 def ask_example(page: Page, question_start: str) -> None:
@@ -115,8 +130,7 @@ def main() -> int:
 
             frames.append(shot("01-home"))
 
-            ask_example(page, "What is the procedure to approve a purchase request")
-            wait_for_answer(page, 1)
+            ask_until_answered(page, "What is the procedure to approve a purchase request")
             frames.append(shot("02-answer"))
             page.locator('[data-testid="stExpander"]').filter(has_text="relevance").first.click()
             page.wait_for_timeout(1000)
@@ -135,8 +149,7 @@ def main() -> int:
                 ("08-outdated-version", "How often do I have to change my password"),
             ]:
                 clear(page)
-                ask_example(page, question)
-                wait_for_answer(page, 1)
+                ask_until_answered(page, question)
                 frames.append(shot(name))
             browser.close()
     finally:

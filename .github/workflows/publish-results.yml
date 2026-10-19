@@ -1,0 +1,66 @@
+# Commits the report and/or the screenshots of a finished "Evaluate with
+# Gemini" run to the repository, from that run's artifact. Started manually.
+name: Publish evaluation results
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: ID of the "Evaluate with Gemini" run (from its URL)
+        required: true
+      include_results:
+        description: Commit the evaluation report to eval/results/<date>/
+        type: boolean
+        default: true
+      include_images:
+        description: Commit the screenshots and the GIF to docs/images/
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download the artifact of the run
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: artifact
+
+      - name: Commit the files
+        env:
+          AUTHOR_NAME: Thierry Daconceição Alvares
+          AUTHOR_EMAIL: 91541305+Thierry-Daconceicao-Alvares@users.noreply.github.com
+          INCLUDE_RESULTS: ${{ inputs.include_results }}
+          INCLUDE_IMAGES: ${{ inputs.include_images }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          report=$(find artifact -path "*eval/results/latest/report.md" | head -n 1)
+          images=$(find artifact -type d -path "*docs/images" | head -n 1)
+          if [ "$INCLUDE_RESULTS" = "true" ] && [ -n "$report" ]; then
+            day=$(date -u +%F)
+            mkdir -p "eval/results/$day"
+            cp "$(dirname "$report")"/report.md "$(dirname "$report")"/results.json "eval/results/$day/"
+            git add "eval/results/$day"
+          fi
+          if [ "$INCLUDE_IMAGES" = "true" ] && [ -n "$images" ]; then
+            mkdir -p docs/images
+            cp "$images"/* docs/images/
+            git add docs/images
+          fi
+          if git diff --cached --quiet; then
+            echo "Nothing to publish."
+            exit 0
+          fi
+          git config user.name "$AUTHOR_NAME"
+          git config user.email "$AUTHOR_EMAIL"
+          git commit -m "Add the evaluation results of run $RUN_ID"
+          git pull --rebase origin main
+          git push origin HEAD:main

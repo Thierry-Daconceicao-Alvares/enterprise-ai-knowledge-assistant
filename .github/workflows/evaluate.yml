@@ -44,6 +44,7 @@ jobs:
       - name: Install
         run: pip install -e ".[ui,dev]"
       - name: Run the evaluation
+        id: evaluation
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANSWER_RETRIEVERS: ${{ inputs.answer_retrievers }}
@@ -71,7 +72,8 @@ jobs:
             docs/images
           if-no-files-found: warn
       - name: Publish the results to the repository
-        if: ${{ inputs.publish }}
+        # Also when the screenshots failed: the report is still worth keeping.
+        if: ${{ !cancelled() && inputs.publish && steps.evaluation.outcome == 'success' }}
         env:
           AUTHOR_NAME: Thierry Daconceição Alvares
           AUTHOR_EMAIL: 91541305+Thierry-Daconceicao-Alvares@users.noreply.github.com
