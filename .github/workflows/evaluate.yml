@@ -102,5 +102,6 @@ jobs:
           git add "eval/results/$folder"
           if [ "$SCREENSHOTS" = "success" ]; then git add docs/images; fi
           git commit -m "Add the evaluation results of $folder"
-          git pull --rebase origin main
+          # Screenshots left uncommitted (a failed capture) must not block the rebase.
+          git pull --rebase --autostash origin main
           git push origin HEAD:main
