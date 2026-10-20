@@ -1,10 +1,13 @@
 # Enterprise AI Knowledge Assistant
 
+[![Live demo](https://img.shields.io/badge/live%20demo-Streamlit-ff4b4b)](https://knowledge-assistant-rag.streamlit.app)
 [![CI](https://github.com/Thierry-Daconceicao-Alvares/enterprise-ai-knowledge-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/Thierry-Daconceicao-Alvares/enterprise-ai-knowledge-assistant/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 A retrieval-augmented generation (RAG) assistant that answers employees' questions from company documents (PDF, Word and text files), cites the file, page and section of every source, and says so when the documents do not contain the answer. It is measured on a labelled evaluation set of 62 cases, including unanswerable questions, contradictory documents, outdated versions and prompt-injection attempts.
+
+**Try it: [knowledge-assistant-rag.streamlit.app](https://knowledge-assistant-rag.streamlit.app)** (synthetic documents of a fictional company; Gemini free tier, so the demo may pause when the daily quota is used up).
 
 ![Demo: an answer with its sources, a question the documents do not cover, a contradiction between two documents, a hidden prompt injection and an outdated version](docs/images/demo.gif)
 
@@ -407,7 +410,7 @@ This prototype does not meet enterprise security requirements and should not be 
 
 - **Local**: see [Installation](#8-installation).
 - **Docker**: the image runs as a non-root user, exposes port 8501 and has a health check; mount a volume on `/app/data/index` to keep the index.
-- **Public demo**: Streamlit Community Cloud, with `PUBLIC_DEMO=true`: the sample documents are preloaded, each visitor gets a private in-memory copy of the index for uploads, and the number of questions and uploads per session is limited.
+- **Public demo**: [Streamlit Community Cloud](https://knowledge-assistant-rag.streamlit.app), with `PUBLIC_DEMO=true`: the sample documents are preloaded, each visitor gets a private in-memory copy of the index for uploads, and the number of questions and uploads per session is limited.
 - **Production plan**: container platform behind a corporate identity provider, managed vector database, paid-tier or enterprise model endpoint with a data processing agreement, monitoring and evaluation on every change. See [docs/deployment.md](docs/deployment.md).
 
 ## 16. Known limitations
