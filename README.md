@@ -8,7 +8,7 @@ A retrieval-augmented generation (RAG) assistant that answers employees' questio
 
 ![Demo: an answer with its sources, a question the documents do not cover, a contradiction between two documents, a hidden prompt injection and an outdated version](docs/images/demo.gif)
 
-**Measured on 62 labelled cases with the real Gemini API:** 57 passed (92%); none of the 7 questions the documents do not cover was answered anyway; no injected instruction followed and no outdated version cited; every citation pointed to a relevant section; about 1.2 seconds and $0.0008 per question. [Results and failure analysis](#13-evaluation-methodology-and-results).
+**Measured on 62 labelled cases with the real Gemini API:** 59 passed (95%, up from 92% after a prompt revision measured on the whole set); none of the 7 questions the documents do not cover was answered anyway; no injected instruction followed and no outdated version cited; every answer cited a required section; about 0.9 second and $0.0008 per question. [Results and failure analysis](#13-evaluation-methodology-and-results).
 
 <details>
 <summary><b>Screenshots</b></summary>
@@ -322,9 +322,9 @@ The CI workflow runs the tests on Python 3.12 and 3.13, builds the Docker image 
 
 The assistant is evaluated on [62 hand-written cases](eval/dataset.jsonl) in 10 categories: single and multi-document questions, questions the documents do not answer, ambiguous questions, contradictions, citations, injection attempts, outdated versions and malformed inputs. Each case names the sections that contain the answer, the key facts a correct answer must contain and the facts it must not contain. Scoring is automatic: [docs/evaluation.md](docs/evaluation.md) defines the metrics and the matching rules. The **Evaluate with Gemini** workflow runs the set against the real API and publishes the report.
 
-**Results**: run of 19 October 2026 with `gemini-3.5-flash-lite` and `gemini-embedding-001`, 5 passages per question. Full report with every failed answer: [eval/results/2026-10-19-prompt-v1/report.md](eval/results/2026-10-19-prompt-v1/report.md).
+**Results**: two runs with `gemini-3.5-flash-lite` and `gemini-embedding-001`, 5 passages per question: the first prompt (19 October 2026) and the revised prompt (20 October 2026), which only changed the instructions on completeness and yes/no verdicts. Full reports with every failed answer: [prompt v1](eval/results/2026-10-19-prompt-v1/report.md), [prompt v2](eval/results/2026-10-20-prompt-v2/report.md).
 
-**Retrieval** (42 questions with labelled sections):
+**Retrieval** (42 questions with labelled sections; identical in both runs):
 
 | Retriever | Hit@1 | Hit@5 | Recall@5 | MRR |
 |---|---:|---:|---:|---:|
@@ -332,39 +332,44 @@ The assistant is evaluated on [62 hand-written cases](eval/dataset.jsonl) in 10 
 | BM25 keyword baseline | 83% | 95% | 79% | 0.88 |
 | Hybrid (reciprocal rank fusion) | 93% | 98% | 88% | 0.95 |
 
-**Answers** (62 cases, same model and prompt, two retrievers):
+**Answers** (62 cases, revised prompt, two retrievers; first prompt in brackets):
 
 | Metric | Semantic retrieval | BM25 retrieval |
 |---|---:|---:|
-| Cases passed | **57 / 62 (92%)** | 48 / 62 (77%) |
-| Fully correct answers (42 answerable questions) | 37 / 42 (88%) | 29 / 42 (69%) |
-| Key facts present | 95% | 76% |
-| Answers citing a required section | 100% | 97% |
-| Questions not covered by the documents, declined | 7 / 7 | 6 / 7 |
+| Cases passed | **59 / 62 (95%)** [57] | 50 / 62 (81%) [48] |
+| Fully correct answers (42 answerable questions) | 39 / 42 (93%) [37] | 31 / 42 (74%) [29] |
+| Key facts present | 96% [95%] | 77% [76%] |
+| Answers citing a required section | 100% [100%] | 97% [97%] |
+| Questions not covered by the documents, declined | 7 / 7 [7] | 6 / 7 [6] |
 | Injected instructions followed / superseded versions cited | 0 / 0 | 0 / 0 |
-| Latency, median / 95th percentile | 1.2 s / 2.1 s | 1.0 s / 1.4 s |
-| Tokens per question, prompt / output | 1,383 / 136 | 1,355 / 118 |
-| Estimated cost per question (paid-tier prices) | $0.00076 | $0.00070 |
+| Latency, median / 95th percentile | 0.9 s / 1.7 s | 0.8 s / 1.3 s |
+| Tokens per question, prompt / output | 1,450 / 162 | 1,422 / 129 |
+| Estimated cost per question (paid-tier prices) | $0.00084 | $0.00075 |
 
-With semantic retrieval, 9 of the 10 categories pass every case; the exception is multi-document questions (2 of 7).
+With semantic retrieval, 9 of the 10 categories pass every case; the exception is multi-document questions (4 of 7, up from 2 of 7).
 
-**Against the targets of the [discovery brief](docs/discovery-brief.md)** (semantic retrieval):
+**Against the targets of the [discovery brief](docs/discovery-brief.md)** (semantic retrieval, revised prompt):
 
 | Criterion | Target | Result | Met |
 |---|---|---|---|
-| Correct answers on answerable questions | at least 80% | 88% | yes |
+| Correct answers on answerable questions | at least 80% | 93% | yes |
 | Answers citing a correct source | at least 90% | 100% | yes |
 | Questions not covered by the documents answered anyway | at most 10% | 0% | yes |
 | Injected instruction followed or superseded version cited | 0 | 0 | yes |
-| Median response time | under 5 s | 1.2 s | yes |
+| Median response time | under 5 s | 0.9 s | yes |
 | Cost per question on the paid tier | under $0.01 | $0.0008 | yes |
 
-**Failure analysis** (the 5 failed cases):
+**Failure analysis.** The first prompt failed 5 cases:
 
 - **Incomplete multi-document answers (3 cases).** For the reference question (approval of a purchase above €50,000), the model named the approvers and the ERP steps but left out the three written quotes. The rule was in a retrieved passage ("at least three written quotes from €5,000; from €50,000, also the bid comparison"), but the model kept only the clause that starts at €50,000. The French version of the question failed the same way, and a third answer did not say that contractor services need a purchase order.
 - **Missing verdict (1 case).** "Can I spend my remote work days working from a café, and what rules apply to its public Wi-Fi?" got the right rules, but not the "No" that the question calls for.
 - **Refused by the provider (1 case).** Gemini's safety filter refused a question about a phishing incident ("An employee clicked a phishing link and typed their password..."), a false positive on a legitimate IT-support question. The application now explains such refusals instead of showing a generic error.
-- **Correction**: the [system prompt](src/knowledge_assistant/prompts.py) now asks for every requirement that applies to the case, including those found in another passage, and for an opening "Yes" or "No" on yes/no questions, even when they are combined with another question. The next run will measure the effect on all 62 cases, to check that the change fixes these failures without breaking others.
+
+The revised [system prompt](src/knowledge_assistant/prompts.py) asks for every requirement that applies to the case, including those found in another passage, and for an opening "Yes" or "No" on yes/no questions. Measured on all 62 cases:
+
+- **Fixed (3 cases):** the English reference question now cites the three written quotes, the contractor answer says that services need a purchase order, and the café question opens with "No".
+- **Still failing (2 cases):** the French version of the reference question still leaves out the three quotes, and the phishing question is still refused by the provider's safety filter.
+- **New failure (1 case):** asked when to order a new employee's laptop, the model gave both delays but no longer mentioned the IT service portal where the order is placed. A prompt change helps some answers and costs others: this is why every change is measured on the whole set rather than on the cases it targets.
 
 **What the comparison shows**:
 
